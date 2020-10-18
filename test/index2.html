@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+        div.gallery {
+            margin: 5px;
+            border: 1px solid #ccc;
+            float: left;
+            width: 200px;
+        }
+        div.gallery:hover {
+            border: 1px solid #777;
+        }
+        div.gallery img {
+            width: 100%;
+            height: auto;
+        }
+        div.desc {
+            padding: 10px;
+            text-align: center;
+            font-size: 12px
+        }
+        div.source img {
+            width: 200px;
+            height: auto;
+        }
+    </style> 
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.85.0.min.js"></script>
+    <script>
+    $(document).ready(function(){
+        AWS.config.region = 'eu-central-1';
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: 'eu-central-1:d8b4fbc0-d7d7-4d79-8998-aa5d3a8b69fb'
+        });
+        var s3 = new AWS.S3({
+            apiVersion: '2006-03-01',
+            params: {Bucket: 'face-scan-hack'}
+        });
+        var lambda = new AWS.Lambda({apiVersion: '2015-03-31'});
+
+        $('#comparephoto').click(function(event) {
+            var files = $('#param1').prop('files');
+            if (!files.length) {
+               return alert('Please choose a file to upload!');
+            }
+            var param1 = files[0];
+            var param2 = $("#param2").val();
+            if (param2 == "") {
+                return alert('please enter employee id');
+            }
+            s3.upload({
+                Key: param1.name,
+                Body: param1,
+                ACL: 'public-read'
+            }, function(err, data) {
+                if (err) {
+                    return alert('Error uploading photo: ', err.message);
+                } else {
+                    //successfully uploaded photo
+                    var lambdaInput = {param1: param1.name, param2: param2 }
+                    var lambdaParams = {
+                        FunctionName: 'verify-face2',
+                        InvocationType: 'RequestResponse',
+                        Payload: JSON.stringify(lambdaInput)
+                    };
+                    lambda.invoke(lambdaParams, function(err, data) {
+                        if (err) {
+                            return alert('Error invoking lambda: ', err.message);
+                        } else {
+                            $('#result').empty();
+                            if (data != null && data.Payload != null) {
+                                var output = JSON.parse(data.Payload);
+                                if (output.result !== null) {
+                                    var imageurl = 'https://compare-faces-hack.s3.eu-central-1.amazonaws.com/' + param2 + '.jpg';
+                                    var htmlelements = [
+                                    '<div><b>' + output.result + '</b></div>',
+                                    '<div><img src ="' + output.result + '.jpg" /></div>',
+                                    '<div class="gallery">',
+                                    '<a target="_blank" href="' + imageurl + '"><img src="' + imageurl +'"/></a>',
+                                    '</div>'
+                                    ]
+                                    var img = gethtml(htmlelements);
+                                    $(img).appendTo('#result');
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        function gethtml(elements) {
+          return elements.join('\n');
+        }
+        $('#param1').on("change", function(e){ 
+           $('#picture').attr('src',URL.createObjectURL(e.target.files[0]));
+           $('#result').empty();
+        });
+    });
+  </script>
+  </head>
+  <body>
+    <h1>Face Based Verification</h1>
+    <div>
+	<form action = "https://gk6ocgwhyl.execute-api.eu-central-1.amazonaws.com/dev/", method="get" enctype="multipart/form-data">
+        Employee Id:
+		<label for="param2"></label>
+        <input id="param2" name="param2" type="text" />
+        <div class="source"><img id="picture"/></div>
+		Face Image: 
+		<label for="param1"></label>
+        <input id="param1" name="param1" type="file" accept="image/*">
+        <button id="comparephoto" type="submit">Compare Faces</button>
+        <br/><br/>
+	</form>
+    </div>
+    <hr/>
+    <br/>
+    <div id="result">
+    </div>
+  </body>
+</html>
