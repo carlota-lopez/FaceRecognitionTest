@@ -1,0 +1,1 @@
+Estas fotos son las que se utilizarán para cargar en la pagina html de prueba del backend

@@ -1,0 +1,3 @@
+Fotos contra las cuales se va a realizar el reconocimiento
+Chico --> empleado 100 (numero a introducir en el employeeid del html)
+Etc...
